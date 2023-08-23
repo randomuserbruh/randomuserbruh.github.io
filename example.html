@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/x-rhu-config">
+        RHU.config = {
+            modules: ["rest", "macro", "weak"]
+        };
+        </script>
+        <script src="RHU/RHU.js"></script>
+    </head>
+    <body>
+
+        <script type="text/javascript">
+            let API_KEY = "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";
+            let ORGANIZATION = "org-3y7cOPT6W2m8ZuVUouJvfyUR";
+
+            RHU.module({ hard: ["RHU.Rest", "RHU.Macro"], trace: new Error() }, function(e) {
+				let display = function()
+				{
+					this.upload.onclick = async () =>
+					{
+						let f = this.fileInput.files[0];
+						if (RHU.exists(f))
+							console.log(await requestFileUpload(f));
+						else this.filemsg.innerHTML = "No File selected";
+					};
+
+					this.getFiles.onclick = async () =>
+					{
+						let resp = await requestListFiles();
+						let fragment = new DocumentFragment();
+						for (let f of resp.data)
+						{
+							let item = document.createElement("li");
+							item.innerHTML = `${f.filename} | ${f.id}`;
+							fragment.append(item);
+						}
+						this.fileList.replaceChildren(fragment);
+					};
+
+					this.train.onclick = async () => 
+					{
+						let req = {
+							training_file: this.fileID.value,
+							model: "gpt-3.5-turbo"
+						};
+						console.log(req);
+						let resp = await requestTrain(req);
+					};
+
+					this.getJobs.onclick = async () =>
+					{
+						let resp = await requestListJobs();
+						let fragment = new DocumentFragment();
+						for (let f of resp.data)
+						{
+							let item = document.createElement("li");
+							item.innerHTML = `${f.status} | ${f.model} | ${f.id}`;
+							fragment.append(item);
+						}
+						this.jobList.replaceChildren(fragment);
+					};
+				}
+				RHU.Macro(display, "display", `
+				<div>
+					<div>
+						<input rhu-id="fileInput" type="file" />
+						<button rhu-id="upload">Upload</button>
+						<div rhu-id="filemsg"></div>
+					</div>
+					<div>
+						<button rhu-id="getFiles">List Files:</button>
+						<ul rhu-id="fileList">
+						</ul>
+					</div>
+				</div>
+				<div>
+					<div>
+						<input rhu-id="fileID" />
+						<button rhu-id="train">Train!</button>
+					</div>
+					<div>
+						<button rhu-id="getJobs">List Training Jobs:</button>
+						<ul rhu-id="jobList">
+						</ul>
+					</div>
+				</div>
+				`, { element: `<div></div>` });
+			
+				document.body.append(document.createMacro("display"));
+
+                let requestFileUpload = RHU.Rest.fetch(
+                    {
+                        url: `https://api.openai.com/v1/files`,
+                        fetch: { 
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${API_KEY}`
+                            }
+                        },
+                        parser: function(file) {
+							var data = new FormData();
+							data.append("file", file);
+							data.append("purpose", "fine-tune");
+                            return {
+                                body: data
+                            }
+                        },
+                        callback: async function(resp)
+                        {
+                            if (resp.status == 200)
+                            {
+                                let json = await resp.json();
+                                return json;
+                            }
+                            else 
+                            {
+                                return resp;
+                            }
+                        }
+                    });
+
+				let requestListFiles = RHU.Rest.fetch(
+                    {
+                        url: `https://api.openai.com/v1/files`,
+                        fetch: { 
+                            method: "GET",
+                            headers: {
+                                "Authorization": `Bearer ${API_KEY}`
+                            }
+                        },
+                        parser: function() {
+                            return {}
+                        },
+                        callback: async function(resp)
+                        {
+                            if (resp.status == 200)
+                            {
+                                let json = await resp.json();
+                                return json;
+                            }
+                            else 
+                            {
+                                return resp;
+                            }
+                        }
+                    });
+
+				let requestTrain = RHU.Rest.fetchJSON(
+                    {
+                        url: `https://api.openai.com/v1/fine-tuning/jobs`,
+                        fetch: { 
+                            method: "Post",
+                            headers: {
+                                "Authorization": `Bearer ${API_KEY}`
+                            },
+                        },
+                        parser: function(body) {
+							let template = {
+								training_file: ""
+							};
+							RHU.parseOptions(template, body);
+                            return {
+                                body: template
+                            }
+                        },
+                        callback: async function(resp)
+                        {
+                            if (resp.status == 200)
+                            {
+                                let json = await resp.json();
+                                return json;
+                            }
+                            else 
+                            {
+                                return null;
+                            }
+                        }
+                    });
+
+				let requestListJobs = RHU.Rest.fetch(
+                    {
+                        url: `https://api.openai.com/v1/fine-tunes`,
+                        fetch: { 
+                            method: "GET",
+                            headers: {
+                                "Authorization": `Bearer ${API_KEY}`
+                            }
+                        },
+                        parser: function() {
+                            return {}
+                        },
+                        callback: async function(resp)
+                        {
+                            if (resp.status == 200)
+                            {
+                                let json = await resp.json();
+                                return json;
+                            }
+                            else 
+                            {
+                                return resp;
+                            }
+                        }
+                    });
+            });
+
+			RHU.module({ hard: ["RHU.Rest"], trace: new Error() }, function(e) {
+				let request = RHU.Rest.fetchJSON(
+					{
+						url: `https://api.openai.com/v1/chat/completions`,
+						fetch: { 
+							method: "POST",
+							headers: {
+								"Authorization": `Bearer ${API_KEY}`,
+								"OpenAI-Organization": "org-3y7cOPT6W2m8ZuVUouJvfyUR"
+							},
+						},
+						parser: function() {
+						    return {
+						    	body: {
+									"model": "gpt-3.5-turbo",
+									"temperature": 0,
+									"messages": [{"role": "user", "content": `Fix the following transcript for typoes and misinterpretations
+Title: UPDATED & DETAILED Honkai: Star Rail Tier List (IN-DEPTH ANALYSIS), Keywords: Rail tier list Star Rail tier Star Rail tier list list after testing Star Rail content Rail tier Star Herta 3:45 Arlan Heng 14:07 March Honkai Rail Arlan 4:40 Serval Serval 5:45 Asta Asta 6:54 Hook Hook 7:51 Physical Sampo 10:49 Pela Pela 12:17 Dan 12:17 Dan Heng Dan Heng 14:07, Context: Asta Star Rail tier list powerful strong weakness advantages damage, Transcript:  Increased for 55% at max level each, this effect can stack up to 5 times to make it an insane stack of attack buffs. She also has a multi hit skill which makes her a pretty good weakness breaker, especially against singular enemies. And finally, her ult gives your whole team up to plus 53 speed at max level, which is a crazy amount. Pay her with and you'll have a damn gokroner team. She sounds incredible but does come with some form of reenaces. Firstly, her charging stacks does not last forever. In fact, the wholeseal  team's charging stack is reduced by 3 at the beginning of Asta's second turn. On top of that, she might not even get a good amount of charging stack if there are not a lot of enemies on the field. So she only gains one stack for each different enemy hit. And finally, since her ult is purely a speed buff which acts as an action advancement, some characters might not gain too much attack boost from her kit unless she hits a lot of targets. So overall, a pretty decent buffer to pick up if you don't have anyone else and can do pretty much anything that you would want a buffer to do. Next off, we have Hook. Hook comes with pretty decent advantages with the most obvious one being her high damage.###`}]
+									/*"messages": [{"role": "user", "content": `Fix the following transcript for typoes and misinterpretations
+CMOS Inverter Lecture 1, Keywords: CMOS PMOS Inverter Electronics Engineering NMOS, Transcript: In this class, we are going to discuss about C mass or complementary mass. Actually, in the previous class we discussed about two more unipolar logic families that is P mass and N mass. Now, we are going to discuss one more unipolar logic family that is C mass. This is very very important and very very high speed logic family and here C mass is nothing but combination of P mass and N mass. You can observe the diagram or logic symbol for C mass. So, here this is came from connecting P mass and N mass back by back. Here you can see P mass you can observe upside, topside in C mass and N mass in downside. So, by connecting just connecting P mass and N mass and just clubbing the output and input, we are going to get C mass structure. So, now this basic C mass is also going to act as inverter. So, that is why C mass or C mass inverter is same like that P mass, P mass inverter is same, N mass, N mass inverter is same. So, here also this is basic C mass which will acts as C mass inverter. So, here how it will acts as C mass inverter we will see. We know that P mass is going to on for your low voltage and N mass is going to on for high voltage. So, now we will see how this going to act, how we are going to get the output. So, here I am taking input and Q1 and Q2 and output V naught. So, these four I am going to consider. Input and your P mass and N mass on off timing and here your output. So, here Q1 and Q2 represents P mass and N mass transistors###`}]*/
+								}
+						    }
+						},
+						callback: async function(resp)
+						{
+							if (resp.status == 200)
+							{
+								let json = await resp.json();
+					            return json;
+							}
+							else 
+							{
+								return null;
+							}
+						}
+					});
+
+				(async function() {
+					console.log(await request());
+				})();
+			});
+        </script>
+    </body>
+</html>
